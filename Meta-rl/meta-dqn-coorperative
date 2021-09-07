@@ -155,7 +155,6 @@ def DQN_train(replays):
     enc_grads = tape2.gradient(kl_loss, encoder_variable)
     Adam2.apply_gradients(zip(enc_grads, encoder_variable))
 
-
     SSa=np.repeat(np.expand_dims(St,0), np.shape(SS)[0], axis=0)
     Q1, Q2 = model.predict([SSa,task_Z], batch_size=np.shape(SSa)[0], verbose=0) 
     Qv= Q1[0:1] 
