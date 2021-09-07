@@ -104,7 +104,7 @@ encoder_variable = encoder.trainable_variables
 Adam = tf.keras.optimizers.Adam()
 Adam2 = tf.keras.optimizers.Adam()
 
-def DQN(replays):
+def DQN_train(replays):
     sample_size = 32
     replay = replays 
     
