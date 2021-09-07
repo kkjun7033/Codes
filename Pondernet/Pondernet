@@ -106,7 +106,7 @@ def Train(x, y, max_train_step, max_seq):
     
 max_sequ = 3
 max_train_step = 5
-to = [x for x in range(29442)]
+to = [x for x in range(data)]
 for n in range(1000):
     idx = random.sample(to, 1000) 
     Train(Train_X[idx], Train_Y[idx], max_train_step, max_sequ)
