@@ -150,3 +150,4 @@ class Agent:
         q_value = self.dqn_model(tf.convert_to_tensor(SSa, dtype=tf.float32), task_Z)
         return q_value[0]
         
+        
