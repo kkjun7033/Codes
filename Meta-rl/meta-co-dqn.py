@@ -98,26 +98,24 @@ modelT = dqn_model()
 
 nbatch = 32
 nphase = 48
-dqn_variable = model.trainable_variables
-encoder_variable = encoder.trainable_variables
-Adam = tf.keras.optimizers.Adam()
-Adam2 = tf.keras.optimizers.Adam()
+dqn_variable = model.trainable_variables + encoder.trainable_variables
+Adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0) #default value of Adam
 
-def DQN_train(replays):
+def DQN(replays):
     sample_size = 32
     replay = replays 
     
-    SS = tf.convert_to_tensor(np.asarray(replay[0]))
+    SS = tf.convert_to_tensor(np.asarray(replay[0]))#np.asarray(replay[0]) ##6천개 sars set 중에 e번째 set 의 [0]인 s
     action = np.asarray(replay[1])
-    rr  = tf.convert_to_tensor(np.asarray(replay[2]), dtype=tf.float32)
-    SS_ = tf.convert_to_tensor(np.asarray(replay[3]))
-    St = np.asarray(replay[4][3]) #for inference
+    rr  = tf.convert_to_tensor(np.asarray(replay[2]), dtype=tf.float32)#np.asarray(replay[2])
+    SS_ = tf.convert_to_tensor(np.asarray(replay[3]))#np.asarray(replay[3])
+    St = np.asarray(replay[4][3]) #for predict(77, 2)
     context = np.asarray(replay[5])
     
     with tf.GradientTape() as tape:
         tape.watch(dqn_variable)
         
-        Z, _, _ = infer_posterior(context) #np.ones((32,17)))
+        Z, m, v = infer_posterior(context)#np.ones((32,17)))
         task_Z = tf.repeat(tf.expand_dims(Z,0), np.shape(SS)[0], axis=0)
         bar_Z = tf.stop_gradient(task_Z)
         
@@ -128,34 +126,30 @@ def DQN_train(replays):
                  tf.math.reduce_max(QQ[:,:,32:35], axis=2)+ tf.math.reduce_max(QQ[:,:,35:39], axis=2)+ tf.math.reduce_max(QQ[:,:,39:41], axis=2)+ tf.math.reduce_max(QQ[:,:,41:44], axis=2)+ tf.math.reduce_max(QQ[:,:,44:48], axis=2)] # Select a(t)
         QQt= tf.convert_to_tensor(QQt)
 
-        Qt = tf.reshape(rr,[32,1]) + discount * tf.reshape(QQt,[32,1]) 
+        Qt = tf.reshape(rr,[32,1]) + discount * tf.reshape(QQt,[32,1])  #32*1, Qt y값
         QQb=[]
         for i in range(32):
             actQ = Mmask(action[i])
             QQb.append(actQ)
-        QQb=tf.convert_to_tensor(QQb, dtype=tf.float32)
-        maskQb.assign(QQb)
+        QQb=tf.convert_to_tensor(QQb, dtype=tf.float32)    #a에 해당하는 mask 값
+        maskQb.assign(QQb)  # Q값을 위한 mask 변경
         _, Q1 = model([SS, task_Z])
         
-        loss = tf.keras.losses.MSE(Qt, Q1)
-    
-    dqn_grads = tape.gradient(loss, dqn_variable)
-    Adam.apply_gradients(zip(dqn_grads, dqn_variable))
-    
-    with tf.GradientTape() as tape2:
-        tape2.watch(encoder_variable)
-        
-        Z, m, v = infer_posterior(context)
+        #loss = tf.reduce_mean((Q1 - Qt)**2)
+        Qloss = tf.keras.losses.MSE(Qt, Q1)
+
         prior = tfp.distributions.Normal(tf.zeros(tf.shape(m)), tf.ones(tf.shape(v)))
         posteriors = tfp.distributions.Normal(m, tf.math.sqrt(v))# for mu, v in zip(m, v)]
         kl_divs = tfp.distributions.kl_divergence(posteriors, prior)# for post in posteriors]
         kl_loss = tf.reduce_sum(kl_divs, -1)
+        
+        loss = Qloss + kl_loss
 
-    enc_grads = tape2.gradient(kl_loss, encoder_variable)
-    Adam2.apply_gradients(zip(enc_grads, encoder_variable))
+    dqn_grads = tape.gradient(loss, dqn_variable)
+    Adam.apply_gradients(zip(dqn_grads, dqn_variable))
 
     SSa=np.repeat(np.expand_dims(St,0), np.shape(SS)[0], axis=0)
-    Q1, Q2 = model.predict([SSa,task_Z], batch_size=np.shape(SSa)[0], verbose=0) 
+    Q1, Q2 = model.predict([SSa,task_Z], batch_size=np.shape(SSa)[0], verbose=0)  #마지막 학습된 모형으로 Q값 뽑아내기.
     Qv= Q1[0:1] 
 
     return Qv
